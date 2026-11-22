@@ -1,0 +1,55 @@
+@startuml C2_hybrid_cloud
+!include <C4/C4_Container>
+
+title Контейнерная диаграмма - Вариант B: гибрид с облачной аналитикой (альтернатива)
+
+Enterprise_Boundary(fb, "Ферма (лёгкий агент)") {
+    Container(cam, "Камеры (RTSP/ONVIF)", "Оборудование", "Наблюдение за секциями")
+    Container(dev, "Кормушки / поилки / фильтрация", "Оборудование", "Разные производители")
+
+    Container(mqtt, "Локальный MQTT-брокер", "EMQX", "Шина телеметрии фермы")
+    Container(cap, "Захват видео", "легкий", "Захват RTSP, извлечение кадров/фрагментов, загрузка в облако")
+    Container(eq, "Управление оборудования", "Microservice", "Адаптеры устройств")
+    Container(al, "Уведомления (local, fallback)", "Microservice", "Алерты ТОЛЬКО по датчикам (без CV при обрыве связи)")
+    Container(db, "База состояний", "PostgreSQL", "Состояние фермы, буфер выгрузки")
+    Container(gw, "Шлюз", "Nginx/API", "Выгрузка кадров и данных")
+    Container(sms, "Уведомления дежурному", "GSM/SMS", "Уведомления дежурному без интернета")
+
+    Rel(cam, cap, "RTSP-поток")
+    Rel(cap, gw, "Кадры/фрагменты", "зависит от связи; при обрыве инференс ОСТАНАВЛИВАЕТСЯ")
+    Rel(eq, dev, "Modbus/OPC-UA/MQTT")
+    Rel(dev, mqtt, "Телеметрия")
+    Rel(mqtt, eq, "Команды")
+    Rel(mqtt, al, "Пороговые события датчиков")
+    Rel(al, sms, "SMS/пуш дежурному", "обход интернета")
+    Rel(db, gw, "События и метрики", "синхрониация, до 10 мин")
+}
+
+Enterprise_Boundary(ccb, "Облачный GPU-кластер") {
+    Container(cvs, "Видеоаналитика (Облако)", "GPU Cluster", "Инференс и детекция событий на кадрах")
+    Container(vs, "Хранилище видео", "Object Storage", "Хранение фрагментов видео")
+    Rel(gw, cvs, "Поток кадров (TLS)", "задержка зависит от канала")
+    Rel(cvs, vs, "Фрагменты")
+}
+
+Enterprise_Boundary(cb, "Центральный сервер (ЦОД)") {
+    Container(sync, "Сервси синхронизации", "Microservice", "Приём событий из облака и ферм")
+    Container(broker, "Брокер сообщений", "RabbitMQ", "Поток событий и метрик")
+    Container(ch, "Хранилище рядов", "ClickHouse", "Метрики всех ферм")
+    Container(cdb, "Основное хранилище", "PostgreSQL", "Поголовье, события")
+    Container(fleet, "Управление сервисами", "Microservice", "Конфиги, health")
+    Container(api, "Интеграционный API", "REST/gRPC", "API для приложений")
+    Container(auth, "Идентификация", "Microservice", "Аутентификация, роли")
+    Container(dash, "Доска мониторинга", "Web App", "Мониторинг")
+
+    Rel(cvs, sync, "События аналитики")
+    Rel(gw, sync, "MQTT over TLS", "store-and-forward")
+    Rel(sync, broker, "Публикация событий")
+    Rel(broker, ch, "Метрики")
+    Rel(broker, cdb, "Состояния")
+    Rel(fleet, gw, "Конфиги (downlink)")
+    Rel(api, cdb, "Данные")
+    Rel(api, auth, "Проверка доступа")
+    Rel(dash, api, "Запросы")
+}
+@enduml

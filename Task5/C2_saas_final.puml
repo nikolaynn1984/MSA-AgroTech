@@ -1,0 +1,53 @@
+@startuml
+
+title C2. SaaS-платформа «АгроМонитор» (To-Be, мультитенантность)
+actor "Клиенты (агрохолдинги)" as T
+actor "Разработчики клиентов" as DEV
+actor "Платёжные системы\n(ЮKassa, СБП)" as PAY
+
+cloud "Облако — Control Plane" {
+  [API Gateway\nOpenAPI, OAuth2, квоты] as GW
+  [Tenant Service\nонбординг, тарифы] as TS
+  [Tariff Service] as TF
+  [Metering Service\nсчётчики использования] as MT
+  [Billing Service\nсчета, периоды] as BL
+  [Payment Gateway\nЮKassa/СБП] as PG
+  [Dev-портал\nдокументация, sandbox] as DP
+  [Identity Service\nроли, JWT] as ID
+}
+
+cloud "Облако — Data Plane (общие сервисы)" {
+  [Аналитика видео (GPU)\nуточнение моделей] as GPU
+  [Fleet Management\nагенты, конфиги, ML-модели] as FM
+  [Мониторинг поголовья,\nалерты, интеграции] as MS
+  database "PostgreSQL\nсхема на тенанта + RLS\n(+ отдельная БД enterprise)" as PG2
+  database "ClickHouse\nсобытия, метрики (tenant_id)" as CH
+  database "S3\nвидео-фрагменты" as S3
+  queue "MQTT-брокер\ntenant/{id}/..." as MQ
+}
+
+package "Фермы клиентов (наследие MVP)" {
+  [Edge-агент + CV-инференс] as AG
+  [Камеры, датчики,\nоборудование] as DEV2
+}
+
+T --> GW : панель самообслуживания
+DEV --> DP : документация, sandbox
+DEV --> GW : REST API (ключи)
+PAY <--> PG : платежи, вебхуки
+GW --> ID
+GW --> MS
+TS --> PG2
+TF --> BL
+MT --> CH
+MT --> BL
+BL --> PG : счета
+AG --> MQ : события/метрики\nstore-and-forward
+MQ --> MS
+DEV2 --> AG
+AG ..> FM : конфиги, модели
+MS --> PG2 : состояние
+MS --> CH : события
+MS --> S3 : видео-фрагменты
+GPU ..> FM : ML-модели
+@enduml

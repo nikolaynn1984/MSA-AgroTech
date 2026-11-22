@@ -1,0 +1,58 @@
+@startuml C2_edge_first
+!include <C4/C4_Container>
+
+title Контейнерная диаграмма - Вариант A: edge-first (основное решение)
+
+Enterprise_Boundary(fb, "Ферма (агент)") {
+    Container(cam, "Камеры (RTSP/ONVIF)", "Оборудование", "Наблюдение за секциями, ИК-режим")
+    Container(dev, "Кормушки / поилки / фильтрация", "Оборудование", "Разные производители")
+
+    Container(mqtt, "Локальный MQTT-брокер", "EMQX", "Шина событий и телеметрии фермы")
+    Container(cv, "Видеоаналитика", "Python + CUDA", "Захват RTSP, инференс, трекинг, детекция событий")
+    Container(lm, "Мониторинг поголовья", "Microservice", "Поголовье, состояние животных")
+    Container(eq, "Управление оборудования", "Microservice", "Адаптеры устройств, команды, телеметрия")
+    Container(fi, "Корма и запасы", "Microservice", "Запасы корма, прогноз расхода")
+    Container(al, "Уведомления (local)", "Microservice", "Приоритизация и локальная доставка алертов")
+    Container(db, "База состояний", "PostgreSQL", "Состояние фермы, события, буфер")
+    Container(ts, "Зранилище метрик", "ClickHouse", "Локальные метрики")
+    Container(buf, "Фрагменты видео", "S3-compatible", "Фрагменты видео вокруг событий")
+    Container(gw, "Шлюз", "Nginx/API", "Беферизация, синхронизация с центром")
+    Container(sms, "Уведомления дежурному", "GSM/SMS + LAN", "Уведомления дежурному без интернета")
+
+    Rel(cam, cv, "RTSP-поток")
+    Rel(cv, mqtt, "События (MQTT)", "millisec")
+    Rel(eq, dev, "Modbus/OPC-UA/MQTT")
+    Rel(dev, mqtt, "Телеметрия")
+    Rel(mqtt, lm, "События")
+    Rel(mqtt, eq, "Команды/телеметрия")
+    Rel(mqtt, fi, "Данные расхода")
+    Rel(lm, db, "Состояние")
+    Rel(eq, db, "Телеметрия")
+    Rel(cv, buf, "Фрагменты видео")
+    Rel(mqtt, al, "Критичные события")
+    Rel(al, sms, "SMS/пуш дежурному", "обход интернета")
+    Rel(db, gw, "События и метрики", "sync, до 10 мин")
+    Rel(ts, gw, "Метрики")
+}
+
+Enterprise_Boundary(cb, "Центральный сервер (ЦОД)") {
+    Container(sync, "Сервсис синхронизации", "Microservice", "Приём данных ферм")
+    Container(broker, "Брокер сообщений", "RabbitMQ", "Поток событий и метрик")
+    Container(ch, "Значение метрик", "ClickHouse", "Метрики всех ферм")
+    Container(cdb, "Основное хранилище", "PostgreSQL", "Поголовье, события, конфигурации")
+    Container(fleet, "Управление сервисами", "Microservice", "Конфиги, обновление моделей, health")
+    Container(api, "Интеграционный API", "REST/gRPC", "API для приложений и внешних систем")
+    Container(auth, "Идентификация", "Microservice", "Аутентификация, роли")
+    Container(dash, "Доска мониторинга", "Web App", "Мониторинг для оператора и руководства")
+
+    Rel(gw, sync, "MQTT over TLS", "буферизация")
+    Rel(sync, broker, "Публикация событий")
+    Rel(broker, ch, "Метрики")
+    Rel(broker, cdb, "Состояния")
+    Rel(fleet, gw, "Конфиги и модели (downlink)")
+    Rel(api, cdb, "Данные")
+    Rel(api, auth, "Проверка доступа")
+    Rel(dash, api, "Запросы")
+    Rel(api, dash, "Данные/алерты")
+}
+@enduml

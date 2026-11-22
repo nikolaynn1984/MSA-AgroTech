@@ -1,0 +1,27 @@
+@startuml C3_HybridCloud_VideoAnalytics
+!include <C4/C4_Component>
+title C3 — Компонентная диаграмма. Видеоаналитика (альтернатива, облачная)
+
+System_Boundary(farm_agent, "Лёгкий агент фермы") {
+  Component(h_capture, "Сервси захвата", "Python, GStreamer", "Захват RTSP и выгрузка фрагментов в облако")
+  Component(h_buffer, "Буферизация отправки", "Python", "Локальная очередь фрагментов на случай деградации канала")
+  Component(h_fallback, "Наблюдатель датчиков", "Python", "Алерты только по датчикам (без видео) при отсутствии связи")
+}
+
+System_Ext(cam, "IP-камеры", "RTSP")
+System_Ext(cloud, "GPU-кластер в облаке", "Инференс и трекинг удалённо")
+System(alerting, "Сервис алертинга (edge)")
+
+Rel(cam, h_capture, "Видеопоток RTSP")
+Rel(h_capture, h_buffer, "Фрагменты видео")
+Rel(h_buffer, cloud, "Выгрузка кадров/фрагментов (TLS)")
+Rel(cloud, h_capture, "События обратно")
+Rel(cloud, alerting, "Критичные события (при наличии связи)")
+Rel(h_fallback, alerting, "Алерты по датчикам (offline)")
+
+note bottom of cloud
+  При обрыве канала инференс останавливается:
+  аналитика недоступна, работает только fallback
+end note
+
+@enduml
