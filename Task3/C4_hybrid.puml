@@ -1,0 +1,38 @@
+@startuml 
+title C4 (уровень кода) — Пайплайн видеоаналитики, облачный вариант
+
+package "agent (farm)" {
+  class VideoUploader {
+    +stream(rtsp_url: str)
+    +push(fragment: VideoFragment)
+  }
+  class UploadBuffer {
+    +enqueue(fragment: VideoFragment)
+    +flush()
+  }
+  class SensorWatcher {
+    +poll(sensorbus): List[SensorAlert]
+  }
+}
+
+package "cloud" {
+  class CloudInferenceService {
+    -model: IDetectionModel
+    +process(fragment: VideoFragment): List[Detection]
+  }
+  class CloudTracker {
+    +update(detections: List[Detection]): List[Track]
+  }
+  class CloudEventService {
+    +classify(track: Track): BehaviorEvent
+    +notify(event: Event)
+  }
+}
+
+VideoUploader --> UploadBuffer
+UploadBuffer --> CloudInferenceService : загрузка по сети (TLS)
+CloudInferenceService --> CloudTracker
+CloudTracker --> CloudEventService
+CloudEventService --> VideoUploader : события обратно
+SensorWatcher ..> CloudEventService : только при наличии связи
+@enduml

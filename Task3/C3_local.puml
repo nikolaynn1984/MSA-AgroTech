@@ -1,0 +1,32 @@
+@startuml 
+!include <C4/C4_Component>
+title C3 — Компонентная диаграмма. Видеоаналитика на ферме (основное решение, локально)
+
+System_Boundary(farm_edge, "Агент фермы (edge)") {
+  Component(va_capture, "Сервси захвата", "Python, GStreamer", "Захват RTSP/ONVIF потоков камер, перекодирование в кадры")
+  Component(va_preproc, "Модуль обработки кадров", "C++/CUDA", "Декодирование, ресайз, коррекция ночной съёмки")
+  Component(va_infer, "Движок интерфейса", "NVIDIA Triton, модель партнёров", "Детекция и классификация: драки, задавливание, болезнь, гибель")
+  Component(va_tracker, "Отслеживание объектов", "Python, ByteTrack", "Трекинг особей в пределах кадра и секции")
+  Component(va_detector, "Детектор событий", "Python", "Правила и пороги: беспокойство, драка, задавливание, пересчёт поголовья")
+  Component(va_pub, "Публикация событий", "Python, paho-mqtt", "Дедупликация и публикация событий в локальный MQTT")
+}
+
+System_Ext(cam, "IP-камеры", "RTSP/ONVIF, ночной режим")
+System(mqttbus, "Локальный MQTT-брокер", "EMQX (edge)")
+
+System(alerting, "Сервис алертинга (edge)")
+System(tracking_db, "Мониторинг поголовья (edge)")
+
+Rel(cam, va_capture, "Видеопоток RTSP")
+Rel(va_capture, va_preproc, "Кадры")
+Rel(va_preproc, va_infer, "Подготовленные кадры")
+Rel(va_infer, va_tracker, "Детекции (bboxes, классы)")
+Rel(va_infer, va_detector, "Детекции (bboxes, классы)")
+Rel(va_tracker, va_detector, "Траектории особей")
+Rel(va_detector, va_pub, "События (тип, секция, серьёзность)")
+Rel(va_pub, mqttbus, "Публикация событий (MQTT)")
+Rel(va_capture, cam, "Захват RTSP")
+Rel(va_pub, alerting, "Критичные события")
+Rel(va_pub, tracking_db, "Пересчёт поголовья")
+
+@enduml

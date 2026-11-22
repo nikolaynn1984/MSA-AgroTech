@@ -1,0 +1,44 @@
+@startuml 
+title C4 (уровень кода) — Пайплайн видеоаналитики, edge-first
+
+package "pipeline" {
+  class VideoSource {
+    +connect(rtsp_url: str)
+    +frames(): Iterator[Frame]
+  }
+  class FrameDecoder {
+    +decode(raw: bytes): Frame
+    +enhance_night_mode(frame: Frame): Frame
+  }
+  class InferenceEngine {
+    -model: IDetectionModel  <<контракт модели партнёров>>
+    +predict(frame: Frame): List[Detection]
+  }
+  interface IDetectionModel {
+    +detect(frame: Frame): List[Detection]
+  }
+  class Tracker {
+    +update(detections: List[Detection]): List[Track]
+  }
+  class BehaviorClassifier {
+    +classify(tracks: List[Track], history: RingBuffer): List[BehaviorEvent]
+  }
+  class EventFactory {
+    +from_behavior(events: List[BehaviorEvent]): Event
+    +dedupe(events: List[Event]): List[Event]
+  }
+  class EventBusPublisher {
+    -client: MqttClient
+    +publish(event: Event, topic: str)
+  }
+}
+
+VideoSource --> FrameDecoder
+FrameDecoder --> InferenceEngine
+InferenceEngine ..> IDetectionModel : реализуется моделью партнёров
+InferenceEngine --> Tracker
+InferenceEngine --> BehaviorClassifier
+Tracker --> BehaviorClassifier
+BehaviorClassifier --> EventFactory
+EventFactory --> EventBusPublisher
+@enduml
