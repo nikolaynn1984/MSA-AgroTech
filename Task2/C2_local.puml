@@ -36,9 +36,9 @@ Enterprise_Boundary(fb, "Ферма (агент)") {
 }
 
 Enterprise_Boundary(cb, "Центральный сервер (ЦОД)") {
-    Container(sync, "Сервси синхронизации", "Microservice", "Приём данных ферм")
+    Container(sync, "Сервсис синхронизации", "Microservice", "Приём данных ферм")
     Container(broker, "Брокер сообщений", "RabbitMQ", "Поток событий и метрик")
-    Container(ch, "Зранение метрик", "ClickHouse", "Метрики всех ферм")
+    Container(ch, "Значение метрик", "ClickHouse", "Метрики всех ферм")
     Container(cdb, "Основное хранилище", "PostgreSQL", "Поголовье, события, конфигурации")
     Container(fleet, "Управление сервисами", "Microservice", "Конфиги, обновление моделей, health")
     Container(api, "Интеграционный API", "REST/gRPC", "API для приложений и внешних систем")
