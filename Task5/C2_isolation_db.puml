@@ -1,0 +1,23 @@
+@startuml
+title C2. Изоляция данных: БД на клиента (enterprise-вариант)
+actor "Enterprise-клиент" as U
+cloud "Облако" {
+  [Шлюз API] as GW
+  [Сервис тенатов] as TS
+  [Общие сервисы\n(аналитика, алерты)] as MS
+  database "PostgreSQL\nклиент A" as PGA
+  database "PostgreSQL\nклиент B" as PGB
+  database "ClickHouse\nбаза на клиента" as CH
+  database "S3\nотдельный bucket" as S3
+}
+package "Фермы клиента A" {
+  [Edge-агенты] as AG
+}
+U --> GW
+AG --> GW : MQTT/TLS
+GW --> MS
+TS --> PGA : маршрутизация по тенанту
+TS --> PGB
+MS --> CH
+MS --> S3
+@enduml

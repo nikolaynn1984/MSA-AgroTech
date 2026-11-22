@@ -1,0 +1,26 @@
+@startuml
+title C2. Изоляция данных: схема на клиента (базовый вариант)
+actor "Клиент SaaS\n(админ, оператор)" as U
+cloud "Облако" {
+  [Шлюз API\nOpenAPI, ключи] as GW
+  [Сервис тенантов\n(панель самообслуживания)] as TS
+  [Billing + Metering] as BL
+  [Мониторинг/аналитика\n(общие сервисы)] as MS
+  database "PostgreSQL\nсхемы: tenant_agro, tenant_b..." as PG
+  database "ClickHouse\nпартиции по tenant_id" as CH
+  database "S3\nпрефиксы tenant/{id}/" as S3
+}
+package "Ферма клиента" {
+  [Камеры, датчики] as DEV
+  [Edge-агент + CV\n(наследие MVP)] as AG
+}
+U --> GW : REST (JWT)
+DEV --> AG
+AG --> GW : MQTT/TLS\ntopic tenant/{id}/...
+GW --> MS
+GW --> TS
+TS --> PG : схема по tenant_id + RLS
+MS --> CH : фильтр tenant_id
+MS --> S3 : tenant/{id}/...
+BL --> CH : метрики использования
+@enduml
